@@ -13,11 +13,12 @@ import { isDriveConfigured } from "./services/drive/driveUploader.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Write Drive token from env var if provided (Railway ephemeral filesystem workaround)
+// Write tokens from env vars if provided (Railway ephemeral filesystem workaround)
 if (process.env.DRIVE_TOKEN_JSON && !fs.existsSync(ENV.DRIVE_TOKEN_PATH)) {
-  try {
-    fs.writeFileSync(ENV.DRIVE_TOKEN_PATH, process.env.DRIVE_TOKEN_JSON, "utf8");
-  } catch {}
+  try { fs.writeFileSync(ENV.DRIVE_TOKEN_PATH, process.env.DRIVE_TOKEN_JSON, "utf8"); } catch {}
+}
+if (process.env.GMAIL_DIGITAL_TOKEN_JSON && !fs.existsSync(ENV.GMAIL_DIGITAL_TOKEN_PATH)) {
+  try { fs.writeFileSync(ENV.GMAIL_DIGITAL_TOKEN_PATH, process.env.GMAIL_DIGITAL_TOKEN_JSON, "utf8"); } catch {}
 }
 
 const app = express();
