@@ -9,40 +9,52 @@ const MONTH_NAMES = [
 ];
 
 const BILLING_PORTAL = "https://billing.myeshopbox.com/portal/eshopbox/index";
-const INVOICE_HASH   = "#/invoices?filter_by=Status.Invoices&sort_order=D";
+const INVOICE_HASH   = "#/invoices?filter_by=Status.Invoices&per_page=200";
 
 async function navigateToInvoices(page) {
   log("Navigating to Eshopbox billing portal...");
 
-  // Step 1: go to billing portal base URL — may trigger SAML redirect to a different domain
+  // Navigate to base URL — SAML may redirect through auth.myeshopbox.com
   await page.goto(BILLING_PORTAL, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(3000); // allow redirect chain to settle
 
-  const landedUrl = page.url();
-  debug(`Portal landed at: ${landedUrl}`);
-
-  // Step 2: if SAML redirected us away from billing.myeshopbox.com, go back now.
-  // SAML cookies are now set, so the second visit should stay on billing portal.
-  if (!landedUrl.startsWith("https://billing.myeshopbox.com")) {
-    log(`SAML redirected to ${landedUrl} — navigating back to billing portal with invoice route...`);
-    await page.goto(BILLING_PORTAL + INVOICE_HASH, { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(3000);
-    debug(`After return nav: ${page.url()}`);
-  } else {
-    // Already on billing portal — apply hash via JS to avoid another SAML round-trip
-    log("On billing portal — applying invoices hash route...");
-    await page.evaluate((hash) => { window.location.hash = hash; }, "/invoices?filter_by=Status.Invoices&sort_order=D");
-    await page.waitForTimeout(3000);
+  // Wait up to 60s for the full SAML chain to settle on billing.myeshopbox.com
+  try {
+    await page.waitForURL(
+      (url) => url.href.startsWith("https://billing.myeshopbox.com"),
+      { timeout: 60000 }
+    );
+  } catch {
+    // Not on billing portal yet — try one more direct navigation
+    warn(`SAML chain did not settle on billing portal (at: ${page.url()}) — retrying...`);
+    await page.goto(BILLING_PORTAL, { waitUntil: "domcontentloaded" });
+    try {
+      await page.waitForURL(
+        (url) => url.href.startsWith("https://billing.myeshopbox.com"),
+        { timeout: 60000 }
+      );
+    } catch {
+      warn(`Still not on billing portal — at: ${page.url()}`);
+    }
   }
 
+  debug(`Landed on billing portal: ${page.url()}`);
+
+  // Apply invoice hash via JS — stays on same domain, no SAML triggered
+  // per_page=200 loads all invoices at once without pagination
+  log("Applying invoices hash route (per_page=200)...");
+  await page.evaluate(() => {
+    window.location.hash = "/invoices?filter_by=Status.Invoices&per_page=200";
+  });
+  await page.waitForTimeout(4000);
+
+  debug(`Invoice page URL: ${page.url()}`);
+
   try {
-    await page.waitForSelector("table tbody tr", { timeout: 15000 });
+    await page.waitForSelector("table tbody tr", { timeout: 20000 });
     log("Invoice list loaded");
   } catch {
     warn("Invoice table not visible — page may not have loaded correctly");
   }
-
-  debug(`Invoice page URL: ${page.url()}`);
 }
 
 export async function downloadInvoices(page, months = []) {
@@ -143,74 +155,35 @@ async function scrollToLoadAllRows(page) {
 
 async function collectMatchingInvoices(page, datePattern, label) {
   try {
-    await page.waitForSelector("table tbody tr", { timeout: 15000 });
+    await page.waitForSelector("table tbody tr", { timeout: 20000 });
   } catch {
     warn(`Invoice table not found for ${label}`);
     return [];
   }
 
-  // The table is virtualized — only ~24 rows exist in the DOM at a time.
-  // Scroll-and-collect: read visible rows, scroll down, repeat until bottom row stops changing.
+  // per_page=200 loads all invoices at once — read all rows directly
+  const rows = page.locator("table tbody tr");
+  const totalRows = await rows.count();
+  debug(`Total rows in table: ${totalRows}`);
+
+  // Log a sample row to verify date format
+  if (totalRows > 0) {
+    const sample = (await rows.first().textContent().catch(() => "")).trim().replace(/\s+/g, " ");
+    debug(`Sample row: ${sample.slice(0, 120)}`);
+  }
+
   const matched = [];
-  const seenInvoices = new Set();
-  let noNewRowsRounds = 0;
-  let lastBottomText = null;
-
-  log("Scanning invoice table (scroll-and-collect)...");
-
-  while (noNewRowsRounds < 4) {
-    const rows = page.locator("table tbody tr");
-    const count = await rows.count();
-
-    // Read all currently visible rows and collect matches
-    for (let i = 0; i < count; i++) {
-      const rowText = (await rows.nth(i).textContent().catch(() => "")).trim().replace(/\s+/g, " ");
-      if (!rowText) continue;
-
-      if (!seenInvoices.has(rowText) && rowText.includes(datePattern)) {
-        const invoiceNum = rowText.split(/\s+/)[0].trim();
-        if (invoiceNum && !seenInvoices.has(invoiceNum)) {
-          debug(`Found invoice: ${invoiceNum} (row: ${rowText.slice(0, 80)})`);
-          matched.push(invoiceNum);
-        }
-        seenInvoices.add(invoiceNum);
-      }
-    }
-
-    // Log a sample of visible rows on first pass to verify date format
-    if (lastBottomText === null && count > 0) {
-      const sample = await rows.first().textContent().catch(() => "");
-      debug(`Sample row text: ${sample.trim().replace(/\s+/g, " ").slice(0, 120)}`);
-    }
-
-    // Scroll down — try multiple methods
-    const lastRow = rows.last();
-    const bottomText = (await lastRow.textContent().catch(() => "")).trim();
-    await lastRow.scrollIntoViewIfNeeded().catch(() => {});
-    await page.keyboard.press("End");
-    await page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-      document.querySelectorAll("*").forEach(el => {
-        const s = getComputedStyle(el);
-        if ((s.overflowY === "auto" || s.overflowY === "scroll") && el.scrollHeight > el.clientHeight) {
-          el.scrollTop = el.scrollHeight;
-        }
-      });
-    });
-    await page.waitForTimeout(2000);
-
-    const newBottomText = (await page.locator("table tbody tr").last().textContent().catch(() => "")).trim();
-    debug(`Scroll-collect: ${count} rows visible, bottom changed: ${newBottomText !== bottomText}`);
-
-    if (newBottomText === bottomText) {
-      noNewRowsRounds++;
-    } else {
-      noNewRowsRounds = 0;
-      lastBottomText = newBottomText;
+  for (let i = 0; i < totalRows; i++) {
+    const rowText = (await rows.nth(i).textContent().catch(() => "")).trim().replace(/\s+/g, " ");
+    if (!rowText.includes(datePattern)) continue;
+    const invoiceNum = rowText.split(/\s+/)[0].trim();
+    if (invoiceNum) {
+      debug(`Found invoice: ${invoiceNum}`);
+      matched.push(invoiceNum);
     }
   }
 
-  log(`Scroll complete. Found ${matched.length} matching invoice(s) for ${label}`);
+  debug(`Rows matching "${datePattern}": ${matched.length}`);
   return matched;
 }
 
