@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: nubo-invoice-automation
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    disk:
+      name: app-storage
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: ESHOPBOX_HEADLESS
+        value: "true"
+      - key: DOWNLOAD_PATH
+        value: /app/data/downloaded
+      - key: ESHOPBOX_SESSION_PATH
+        value: /app/data/eshopbox-session.json
+      - key: KWIKENGAGE_SESSION_PATH
+        value: /app/data/kwikengage-session.json
+      - key: DRIVE_TOKEN_PATH
+        value: /app/data/token-drive.json
