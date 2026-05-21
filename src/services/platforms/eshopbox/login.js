@@ -91,11 +91,9 @@ async function resolveOtp() {
     return { otp: ENV.ESHOPBOX_DEV_OTP, entryId: null };
   }
 
-  // Try Gmail API if OAuth credentials are configured
-  const hasGmailOAuth =
-    fs.existsSync(ENV.GMAIL_CREDENTIALS_PATH) && fs.existsSync(ENV.GMAIL_TOKEN_PATH);
-  if (hasGmailOAuth) {
-    log("Fetching OTP via Gmail API...");
+  // Try IMAP if EMAIL_USER + EMAIL_APP_PASSWORD are configured
+  if (ENV.EMAIL_USER && ENV.EMAIL_APP_PASSWORD) {
+    log("Fetching OTP via IMAP...");
     setStatus("otp_pending");
     try {
       const result = await fetchOtpViaImap({
@@ -106,11 +104,11 @@ async function resolveOtp() {
       });
       return result;
     } catch (err) {
-      warn(`Gmail API OTP fetch failed: ${err.message}`);
+      warn(`IMAP OTP fetch failed: ${err.message}`);
       if (!ENV.ESHOPBOX_MANUAL_OTP) throw err;
     }
   } else {
-    warn("Gmail OAuth not configured (credentials.json / token.json missing)");
+    warn("IMAP not configured (EMAIL_USER / EMAIL_APP_PASSWORD missing)");
   }
 
   // Fallback to manual
