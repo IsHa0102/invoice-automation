@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Nubokind — Invoice Automation</title>
+<style>
+:root {
+  --bg:          #FAF5EB;
+  --surface:     #FAF5EB;
+  --surface2:    #F5EDD8;
+  --surface3:    #EDE1C8;
+  --border:      #D8C9A8;
+  --border2:     #C2AE8A;
+  --text:        #2A180A;
+  --text2:       #6B4E32;
+  --text3:       #A8906E;
+  --accent:      #7B5FC8;
+  --accent-dim:  rgba(123,95,200,.13);
+  --accent-h:    #6A4EB8;
+  --green:       #4E9468;
+  --green-dim:   rgba(78,148,104,.13);
+  --red:         #BA4030;
+  --red-dim:     rgba(186,64,48,.12);
+  --yellow:      #C47E08;
+  --yellow-dim:  rgba(196,126,8,.13);
+  --purple:      #7B5FC8;
+  --purple-dim:  rgba(123,95,200,.13);
+  --r:           8px;
+  --r-sm:        5px;
+  --r-lg:        12px;
+  --font:        'Inter', system-ui, -apple-system, sans-serif;
+  --mono:        'JetBrains Mono','Fira Code','Consolas',monospace;
+  --sb-w:        224px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;display:flex;height:100vh;overflow:hidden}
+a{color:var(--accent);text-decoration:none}
+
+/* ─── Sidebar ──────────────────────────────────────────────────────────────── */
+.sidebar{width:var(--sb-w);min-width:var(--sb-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto;user-select:none}
+.brand{padding:16px 16px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;align-items:center;flex-shrink:0;background:var(--surface)}
+.brand-logo{height:38px;width:auto;max-width:164px;object-fit:contain;display:block}
+.brand-tagline{font-size:10px;color:var(--text3);margin-top:6px;letter-spacing:.6px;text-transform:uppercase}
+
+.nav{padding:10px 8px;flex:1}
+.nav-section{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;padding:10px 8px 4px;margin-top:4px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:var(--r-sm);color:var(--text2);font-size:13px;cursor:pointer;transition:color .12s,background .12s;margin-bottom:1px}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent)}
+.nav-ic{width:16px;text-align:center;flex-shrink:0;font-style:normal}
+
+.sb-footer{padding:12px 14px;border-top:1px solid var(--border);flex-shrink:0}
+.sys-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);margin-bottom:3px}
+.sb-clock{font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums}
+
+/* ─── Content ──────────────────────────────────────────────────────────────── */
+.content{flex:1;overflow-y:auto;background:var(--bg)}
+.view{display:none;padding:28px;min-height:100%}
+.view.active{display:block}
+
+/* ─── Page header ──────────────────────────────────────────────────────────── */
+.pg-header{margin-bottom:22px}
+.pg-title{font-size:20px;font-weight:600;letter-spacing:-.3px}
+.pg-sub{font-size:13px;color:var(--text2);margin-top:3px}
+
+/* ─── Stats row ────────────────────────────────────────────────────────────── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+.stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px}
+.stat-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);margin-bottom:6px}
+.stat-val{font-size:26px;font-weight:700;line-height:1}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.stat-val.green{color:var(--green)}
+.stat-val.red{color:var(--red)}
+.stat-val.blue{color:var(--accent)}
+
+/* ─── Cards ────────────────────────────────────────────────────────────────── */
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.55px}
+
+/* ─── Two-col layout ───────────────────────────────────────────────────────── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+
+/* ─── Platform grid ────────────────────────────────────────────────────────── */
+.platform-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-bottom:20px}
+.pc{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;transition:border-color .15s}
+.pc:hover{border-color:var(--border2)}
+.pc.stub{opacity:.55}
+.pc-hdr{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pc-emoji{width:42px;height:42px;border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.pc-emoji.g {background:var(--green-dim);border:1px solid rgba(34,197,94,.15)}
+.pc-emoji.b {background:var(--accent-dim);border:1px solid rgba(79,142,247,.15)}
+.pc-emoji.o {background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.15)}
+.pc-emoji.p {background:var(--purple-dim);border:1px solid rgba(167,139,250,.15)}
+.pc-emoji.gr{background:rgba(107,78,50,.07);border:1px solid rgba(107,78,50,.15)}
+.pc-name{font-size:14px;font-weight:600}
+.pc-desc{font-size:12px;color:var(--text2);margin-top:2px}
+.pc-badge{font-size:11px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap;margin-left:auto;flex-shrink:0}
+.pc-badge.connected{background:var(--green-dim);color:var(--green)}
+.pc-badge.soon{background:rgba(148,163,184,.1);color:var(--text3)}
+.pc-badge.error{background:var(--red-dim);color:var(--red)}
+.pc-details{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.pc-row{display:flex;justify-content:space-between;font-size:12px}
+.pc-row .lbl{color:var(--text2)}
+.pc-row .good{color:var(--green)}
+.pc-row .bad{color:var(--red)}
+.pc-row .val{color:var(--text)}
+.pc-actions{display:flex;gap:8px}
+
+/* ─── Job list ─────────────────────────────────────────────────────────────── */
+.job-table{width:100%;border-collapse:collapse}
+.job-table th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.job-table td{padding:10px 12px;border-bottom:1px solid rgba(30,45,71,.45);font-size:13px;vertical-align:middle}
+.job-table tbody tr:hover{background:rgba(0,0,0,.03)}
+.job-table tbody tr:last-child td{border-bottom:none}
+.job-params{font-size:11px;color:var(--text2)}
+
+/* ─── Status badges ─────────────────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.badge.queued {background:rgba(107,78,50,.1);color:var(--text2)}
+.badge.running{background:var(--accent-dim);color:var(--accent);animation:pulse 1.5s infinite}
+.badge.success{background:var(--green-dim);color:var(--green)}
+.badge.failed {background:var(--red-dim);color:var(--red)}
+
+/* ─── Auth status pill ──────────────────────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12px;font-weight:500}
+.pill.idle{background:rgba(107,78,50,.1);color:var(--text2)}
+.pill.authenticated{background:var(--green-dim);color:var(--green)}
+.pill.failed{background:var(--red-dim);color:var(--red)}
+.pill.logging_in,.pill.otp_pending,.pill.verifying,
+.pill.submitting_email,.pill.waiting_otp_input,
+.pill.fetching_otp,.pill.submitting_otp{background:var(--accent-dim);color:var(--accent)}
+
+/* ─── Auth rows ─────────────────────────────────────────────────────────────── */
+.auth-grid{display:flex;flex-direction:column;gap:7px}
+.auth-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface3);border-radius:var(--r-sm);font-size:13px}
+.auth-row .lbl{color:var(--text2)}
+.auth-row .val{font-weight:500;max-width:60%;text-align:right;word-break:break-all}
+
+/* ─── OTP display ───────────────────────────────────────────────────────────── */
+.otp-big{font-size:44px;font-weight:700;letter-spacing:12px;font-variant-numeric:tabular-nums;color:var(--accent);padding:16px 0 4px}
+.otp-big.empty{color:var(--border2);font-size:30px;letter-spacing:6px}
+.otp-meta{font-size:12px;color:var(--text2);margin-top:4px}
+
+/* ─── OTP table ─────────────────────────────────────────────────────────────── */
+.otp-table{width:100%;border-collapse:collapse;font-size:12px}
+.otp-table th{color:var(--text2);font-weight:500;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+.otp-table td{padding:7px 8px;border-bottom:1px solid rgba(30,45,71,.4)}
+.otp-table tbody tr:last-child td{border-bottom:none}
+
+/* ─── Timeline ──────────────────────────────────────────────────────────────── */
+.tl{display:flex;flex-direction:column}
+.tl-step{display:flex;align-items:flex-start;gap:11px;padding:6px 0}
+.tl-dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:2px}
+.tl-dot.done  {border-color:var(--green);background:var(--green-dim);color:var(--green)}
+.tl-dot.active{border-color:var(--accent);background:var(--accent-dim);color:var(--accent);animation:pulse 1.5s infinite}
+.tl-dot.pend  {border-color:var(--border);color:var(--text3)}
+.tl-dot.fail  {border-color:var(--red);background:var(--red-dim);color:var(--red)}
+.tl-lbl{font-size:13px;font-weight:500}
+.tl-sub{font-size:11px;color:var(--text2);margin-top:1px}
+
+/* ─── Indicator row ─────────────────────────────────────────────────────────── */
+.indicator{display:flex;align-items:center;gap:9px;padding:10px 12px;background:var(--surface3);border-radius:var(--r-sm);font-size:13px;margin-bottom:10px}
+
+/* ─── Log viewer ────────────────────────────────────────────────────────────── */
+.log-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.log-filter{display:flex;gap:4px}
+.log-filter button{padding:4px 9px;border-radius:var(--r-sm);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;transition:.12s}
+.log-filter button.active,.log-filter button:hover{background:var(--surface3);color:var(--text);border-color:var(--accent)}
+.log-search{flex:1;min-width:120px;max-width:220px;padding:5px 10px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface3);color:var(--text);font-size:12px;outline:none}
+.log-search:focus{border-color:var(--accent)}
+.log-box{background:#2A180A;border:1px solid var(--border2);border-radius:var(--r-sm);overflow-y:auto;padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.75}
+.log-box .log-msg{color:#E8D8C0}
+.log-box .log-ts{color:#6B5040}
+.log-box .log-lvl.info{color:#9A7FD4}
+.log-box .log-lvl.debug{color:#7A6050}
+.log-box .log-lvl.warn{color:#C4880A}
+.log-box .log-lvl.error{color:#D05040}
+.log-box.compact{height:200px}
+.log-box.full{height:calc(100vh - 250px);min-height:300px}
+.log-line{display:flex;gap:10px}
+.log-ts{color:var(--text3);white-space:nowrap;font-size:11px;padding-top:1px}
+.log-lvl{width:36px;font-weight:600;font-size:11px;flex-shrink:0}
+.log-lvl.info {color:var(--accent)}
+.log-lvl.debug{color:var(--text3)}
+.log-lvl.warn {color:var(--yellow)}
+.log-lvl.error{color:var(--red)}
+.log-msg{color:var(--text);flex:1;word-break:break-word}
+
+/* ─── Buttons ───────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:var(--r);border:none;font-size:13px;font-weight:500;cursor:pointer;transition:background .12s,opacity .12s;white-space:nowrap;font-family:var(--font)}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-h)}
+.btn-primary:disabled{opacity:.38;cursor:not-allowed}
+.btn-ghost{background:var(--surface3);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--border)}
+.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.btn-danger:hover{background:rgba(239,68,68,.2)}
+
+/* ─── Month chips ───────────────────────────────────────────────────────────── */
+.month-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.m-chip{padding:8px 4px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface3);color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;text-align:center;transition:.12s;user-select:none}
+.m-chip:hover{border-color:var(--accent);color:var(--text)}
+.m-chip.sel{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+/* ─── Modal ─────────────────────────────────────────────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(4px)}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-lg);width:100%;max-width:400px;box-shadow:0 24px 64px rgba(42,24,10,.22)}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0}
+.modal-title{font-size:15px;font-weight:600}
+.modal-x{background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1}
+.modal-x:hover{color:var(--text)}
+.modal-body{padding:18px 20px}
+.modal-foot{padding:0 20px 18px;display:flex;justify-content:flex-end;gap:8px}
+.modal-lbl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.modal-yr-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.modal-yr{background:var(--surface3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r-sm);font-size:13px;cursor:pointer;outline:none}
+.modal-yr:focus{border-color:var(--accent)}
+.modal-sel-info{font-size:12px;color:var(--text2);margin-top:10px;min-height:18px}
+
+/* ─── Dot ───────────────────────────────────────────────────────────────────── */
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+.dot.off{background:var(--text3)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ─── Section row ───────────────────────────────────────────────────────────── */
+.sec-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sec-title{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+
+/* ─── Controls row ──────────────────────────────────────────────────────────── */
+.ctrl-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+/* ─── Empty ─────────────────────────────────────────────────────────────────── */
+.empty{color:var(--text3);font-size:13px;padding:16px 0;text-align:center}
+
+/* ─── Toast ─────────────────────────────────────────────────────────────────── */
+#toast{position:fixed;bottom:22px;right:22px;background:var(--surface2);border:1px solid var(--border2);padding:11px 17px;border-radius:var(--r);font-size:13px;transform:translateY(70px);opacity:0;transition:.22s;z-index:2000;max-width:300px;pointer-events:none}
+#toast.show{transform:none;opacity:1}
+#toast.success{border-color:var(--green);color:var(--green)}
+#toast.error{border-color:var(--red);color:var(--red)}
+
+/* ─── Responsive ────────────────────────────────────────────────────────────── */
+@media(max-width:900px){
+  .two-col{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .sidebar{width:48px;min-width:48px}
+  .brand-name,.brand-sub,.nav-item span:not(.nav-ic),.sb-footer .sys-row span:not(.dot){display:none}
+  .view{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<nav class="sidebar">
+  <div class="brand">
+    <img src="/nubo official logo.jpeg" alt="Nübo" class="brand-logo"/>
+    <div class="brand-tagline">Invoice Automation</div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-section">Workspace</div>
+    <div class="nav-item active" data-view="overview">
+      <i class="nav-ic">◈</i><span>Overview</span>
+    </div>
+    <div class="nav-item" data-view="platforms">
+      <i class="nav-ic">⬡</i><span>Platforms</span>
+    </div>
+    <div class="nav-item" data-view="jobs">
+      <i class="nav-ic">▷</i><span>Automations</span>
+    </div>
+
+    <div class="nav-section">Monitoring</div>
+    <div class="nav-item" data-view="logs">
+      <i class="nav-ic">≡</i><span>Logs</span>
+    </div>
+
+    <div class="nav-section">Actions</div>
+    <div class="nav-item" data-view="runall">
+      <i class="nav-ic">⚡</i><span>Run All</span>
+    </div>
+  </div>
+
+  <div class="sb-footer">
+    <div class="sys-row">
+      <div class="dot" id="sysDot"></div>
+      <span id="sysLabel">Connecting…</span>
+    </div>
+    <div class="sb-clock" id="sbClock"></div>
+  </div>
+</nav>
+
+<!-- ── Main content ────────────────────────────────────────────────────────── -->
+<main class="content">
+
+<!-- ════ View: Overview ══════════════════════════════════════════════════════ -->
+<div class="view active" id="view-overview">
+  <div class="pg-header">
+    <div class="pg-title">Overview</div>
+    <div class="pg-sub">Nubokind Invoice Automation — command center</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Connected</div>
+      <div class="stat-val blue" id="stat-connected">—</div>
+      <div class="stat-sub">of <span id="stat-total">—</span> platforms</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Jobs Run</div>
+      <div class="stat-val" id="stat-jobs">—</div>
+      <div class="stat-sub">total this session</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active</div>
+      <div class="stat-val" id="stat-active">0</div>
+      <div class="stat-sub">running right now</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Job</div>
+      <div class="stat-val" id="stat-last" style="font-size:16px;padding-top:4px">—</div>
+      <div class="stat-sub" id="stat-last-sub"></div>
+    </div>
+  </div>
+
+  <!-- Platform connector cards -->
+  <div class="sec-row">
+    <div class="sec-title">Platform Connectors</div>
+    <button class="btn btn-ghost btn-sm" onclick="showView('platforms')">View all →</button>
+  </div>
+  <div class="platform-grid" id="overview-platforms">
+    <div class="empty">Loading…</div>
+  </div>
+
+  <!-- Recent jobs -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title">Recent Jobs</div>
+      <button class="btn btn-ghost btn-sm" onclick="showView('jobs')">View all →</button>
+    </div>
+    <table class="job-table" id="overview-jobs-table">
+      <thead><tr>
+        <th>Platform</th><th>Status</th><th>When</th>
+      </tr></thead>
+      <tbody id="overview-jobs-body">
+        <tr><td colspan="3" class="empty">No jobs yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Live logs (compact) -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-hdr">
+      <div class="card-title">Live Logs</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="showView('logs')">Full view →</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearLogs()">Clear</button>
+      </div>
+    </div>
+    <div class="log-box compact" id="ov-log-box">
+      <div class="log-line"><span class="log-msg" style="color:var(--text3)">Waiting for logs…</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ View: Platforms ══════════════════════════════════════════════════════ -->
+<div class="view" id="view-platforms">
+  <div class="pg-header">
+    <div class="pg-title">Platform Connectors</div>
+    <div class="pg-sub">Manage invoice sources and authentication</div>
+  </div>
+  <div class="platform-grid" id="platforms-grid">
+    <div class="empty">Loading…</div>
+  </div>
+
+  <!-- eShopBox auth detail -->
+  <div class="two-col">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr"><div class="card-title">eShopBox — Auth Status</div></div>
+      <div class="auth-grid">
+        <div class="auth-row"><span class="lbl">Status</span><span id="plat-status" class="pill idle">idle</span></div>
+        <div class="auth-row"><span class="lbl">Account</span><span class="val" id="plat-email">—</span></div>
+        <div class="auth-row"><span class="lbl">Session</span><span class="val" id="plat-session">—</span></div>
+        <div class="auth-row"><span class="lbl">Session Age</span><span class="val" id="plat-age">—</span></div>
+        <div class="auth-row"><span class="lbl">Last Login</span><span class="val" id="plat-login">—</span></div>
+        <div class="auth-row"><span class="lbl">Last Error</span><span class="val" id="plat-error" style="color:var(--red)">—</span></div>
+      </div>
+      <div class="ctrl-row">
+        <button class="btn btn-ghost btn-sm" onclick="testGmail()">📨 Test Gmail</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearSession()">🗑 Clear Session</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr"><div class="card-title">eShopBox — Workflow</div></div>
+      <div class="tl" id="plat-timeline"></div>
+      <div style="margin-top:12px;font-size:12px;color:var(--text2)">Last run: <span id="plat-lastrun">—</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ View: Jobs ═══════════════════════════════════════════════════════════ -->
+<div class="view" id="view-jobs">
+  <div class="pg-header">
+    <div class="pg-title">Automation Jobs</div>
+    <div class="pg-sub">All automation runs across platforms</div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title">Job History</div>
+      <div class="log-filter" id="jobs-filter">
+        <button class="active" onclick="setJobFilter('all',this)">All</button>
+        <button onclick="setJobFilter('running',this)">Running</button>
+        <button onclick="setJobFilter('success',this)">Success</button>
+        <button onclick="setJobFilter('failed',this)">Failed</button>
+      </div>
+    </div>
+    <table class="job-table">
+      <thead><tr>
+        <th>Job ID</th><th>Platform</th><th>Parameters</th>
+        <th>Status</th><th>Started</th><th>Duration</th>
+      </tr></thead>
+      <tbody id="jobs-body">
+        <tr><td colspan="6" class="empty">No jobs yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ════ View: Logs ═══════════════════════════════════════════════════════════ -->
+<div class="view" id="view-logs">
+  <div class="pg-header">
+    <div class="pg-title">Logs</div>
+    <div class="pg-sub">Real-time automation engine output</div>
+  </div>
+
+  <div class="card">
+    <div class="log-toolbar">
+      <div class="log-filter">
+        <button class="active" onclick="setLogFilter('all',this)">All</button>
+        <button onclick="setLogFilter('info',this)">Info</button>
+        <button onclick="setLogFilter('debug',this)">Debug</button>
+        <button onclick="setLogFilter('warn',this)">Warn</button>
+        <button onclick="setLogFilter('error',this)">Error</button>
+      </div>
+      <input class="log-search" id="log-search" placeholder="Search logs…" oninput="renderLogs()"/>
+      <button class="btn btn-ghost btn-sm" onclick="clearLogs()">Clear</button>
+    </div>
+    <div class="log-box full" id="log-box">
+      <div class="log-line"><span class="log-msg" style="color:var(--text3)">Waiting for logs…</span></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════ View: Run All ════════════════════════════════════════════════════════ -->
+<div class="view" id="view-runall">
+  <div class="pg-header">
+    <div class="pg-title">Run All Platforms</div>
+    <div class="pg-sub">Download invoices from all connected platforms for a single month, then upload to Google Drive</div>
+  </div>
+
+  <!-- Month selector -->
+  <div class="card">
+    <div class="card-hdr"><div class="card-title">Select Month</div></div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <select class="modal-yr" id="ra-month" style="min-width:130px"></select>
+      <select class="modal-yr" id="ra-year"></select>
+      <button class="btn btn-primary" id="ra-run-btn" onclick="submitRunAll()">▶ Run All Platforms</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-top:12px;line-height:1.6">
+      Runs <strong style="color:var(--text)">eShopBox → GoKwik → Easebuzz → KwikEngage</strong> sequentially,
+      then uploads all downloaded invoices to Google Drive.
+    </div>
+  </div>
+
+  <!-- Progress (shown when a run-all job exists) -->
+  <div class="card" id="ra-progress-card" style="display:none">
+    <div class="card-hdr">
+      <div class="card-title">Progress</div>
+      <span class="badge queued" id="ra-job-badge">—</span>
+    </div>
+    <div class="tl" id="ra-tl"></div>
+    <div style="font-size:12px;color:var(--text2);margin-top:10px" id="ra-summary"></div>
+  </div>
+
+  <!-- Google Drive status -->
+  <div class="card">
+    <div class="card-hdr"><div class="card-title">Google Drive</div></div>
+    <div class="auth-grid" style="margin-bottom:12px">
+      <div class="auth-row">
+        <span class="lbl">Upload account</span>
+        <span class="val">isha@nubokind.com</span>
+      </div>
+      <div class="auth-row">
+        <span class="lbl">Status</span>
+        <span class="val" id="ra-drive-status">Checking…</span>
+      </div>
+    </div>
+    <div id="ra-drive-hint" style="font-size:12px;color:var(--text2);margin-bottom:12px;display:none;line-height:1.6">
+      Drive is not yet authorized. Run this command in the terminal once to enable uploads:
+      <br><code style="background:var(--surface3);padding:3px 8px;border-radius:4px;font-family:var(--mono);font-size:12px;display:inline-block;margin-top:6px">node scripts/driveAuth.js</code>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="checkDriveStatus()">⟳ Check Drive Connection</button>
+  </div>
+</div>
+
+</main><!-- end .content -->
+
+<!-- ── Run Modal ───────────────────────────────────────────────────────────── -->
+<div class="overlay" id="runModal" style="display:none" onclick="handleOverlayClick(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modal-title">Run Invoice Download</div>
+      <button class="modal-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-lbl">Select Invoice Months</div>
+      <div class="modal-yr-row">
+        <select class="modal-yr" id="modal-year"></select>
+        <button class="btn btn-ghost btn-sm" onclick="modalSelectAll()">All</button>
+        <button class="btn btn-ghost btn-sm" onclick="modalClear()">Clear</button>
+      </div>
+      <div class="month-grid" id="modal-chips"></div>
+      <div class="modal-sel-info" id="modal-sel-info">No months selected</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="modal-run-btn" onclick="submitRun()">▶ Run</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── Constants ─────────────────────────────────────────────────────────────
+const MONTH_NAMES  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const PLATFORM_COLORS = { eshopbox:'g', gokwik:'b', amazon:'o', shiprocket:'b', razorpay:'p', easebuzz:'p' };
+const STEP_LABELS = {
+  idle:'Idle', starting:'Starting', opening_login:'Opening Login',
+  submitting_email:'Submitting Email', waiting_otp_input:'Waiting for OTP Field',
+  fetching_otp:'Fetching OTP', submitting_otp:'Submitting OTP',
+  verifying:'Verifying Login', downloading_invoices:'Downloading Invoices', complete:'Complete',
+};
+const STEP_ORDER = ['opening_login','submitting_email','waiting_otp_input','fetching_otp','submitting_otp','verifying','downloading_invoices','complete'];
+
+// ─── State ─────────────────────────────────────────────────────────────────
+let allLogs = [], logFilter = 'all', jobFilter = 'all';
+let statusData = {}, platformsData = [], jobsData = [];
+let modalConnectorId = null, modalSelectedMonths = new Set();
+
+// ─── View routing ───────────────────────────────────────────────────────────
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const view = document.getElementById('view-' + id);
+  if (view) view.classList.add('active');
+  const navItem = document.querySelector(`[data-view="${id}"]`);
+  if (navItem) navItem.classList.add('active');
+}
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => showView(el.dataset.view));
+});
+
+// ─── Clock ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  const t = new Date();
+  setText('sbClock', t.toLocaleTimeString());
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ─── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  setTimeout(() => el.className = '', 3200);
+}
+
+// ─── API helper ─────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  return r.json();
+}
+
+// ─── Polling ────────────────────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    statusData = await api('/api/status');
+    renderStatus();
+    updateSysIndicator(true);
+  } catch {
+    updateSysIndicator(false);
+  }
+}
+async function pollPlatforms() {
+  try {
+    const d = await api('/api/platforms');
+    platformsData = d.platforms || [];
+    renderPlatforms();
+    renderStats();
+  } catch {}
+}
+async function pollJobs() {
+  try {
+    const d = await api('/api/jobs');
+    jobsData = d.jobs || [];
+    renderJobs();
+    renderStats();
+    renderRunAllProgress();
+  } catch {}
+}
+async function pollLogs() {
+  try {
+    const d = await api('/api/logs');
+    allLogs = d.logs || [];
+    renderLogs();
+  } catch {}
+}
+
+// ─── Sys indicator ──────────────────────────────────────────────────────────
+function updateSysIndicator(online) {
+  const dot = document.getElementById('sysDot');
+  const lbl = document.getElementById('sysLabel');
+  const running = statusData.running;
+  if (!online) { dot.className = 'dot off'; lbl.textContent = 'Offline'; return; }
+  if (running)  { dot.className = 'dot'; lbl.textContent = 'Running'; }
+  else          { dot.className = 'dot'; lbl.textContent = 'Online'; }
+}
+
+// ─── Stats ──────────────────────────────────────────────────────────────────
+function renderStats() {
+  const connected = platformsData.filter(p => p.available).length;
+  const total     = platformsData.length;
+  const running   = jobsData.filter(j => j.status === 'running').length;
+  const latest    = jobsData[0];
+
+  setText('stat-connected', connected);
+  setText('stat-total', total);
+  setText('stat-jobs', jobsData.length);
+  setText('stat-active', running);
+  const el = document.getElementById('stat-active');
+  el.className = 'stat-val' + (running > 0 ? ' blue' : '');
+
+  if (latest) {
+    const lel = document.getElementById('stat-last');
+    lel.className = 'stat-val' + (latest.status === 'success' ? ' green' : latest.status === 'failed' ? ' red' : '');
+    lel.style.fontSize = '15px';
+    lel.style.paddingTop = '5px';
+    lel.textContent = latest.status === 'success' ? '✓ Success' : latest.status === 'failed' ? '✗ Failed' : '⟳ Running';
+    setText('stat-last-sub', latest.connectorId + ' · ' + timeAgo(latest.createdAt));
+  }
+}
+
+// ─── Status ─────────────────────────────────────────────────────────────────
+function renderStatus() {
+  const { session = {}, running, lastResult, config = {} } = statusData;
+
+  // Auth pill
+  ['plat-status'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const s = session.status || 'idle';
+    el.className = 'pill ' + s;
+    el.textContent = s.replace(/_/g,' ');
+  });
+
+  setText('plat-email', config.eshopEmail || '—');
+  setText('plat-session', session.sessionFile ? '✅ ' + session.sessionFile : '❌ Not found');
+  setText('plat-age', session.sessionAgeMinutes != null ? session.sessionAgeMinutes + ' min ago' : '—');
+  setText('plat-login', session.lastLogin ? new Date(session.lastLogin).toLocaleString() : '—');
+  setText('plat-error', session.lastError || '—');
+
+  // Timeline
+  renderTimeline(session, running, lastResult);
+
+  if (lastResult) {
+    setText('plat-lastrun', lastResult.completedAt
+      ? (lastResult.success ? '✅ ' : '❌ ') + new Date(lastResult.completedAt).toLocaleString()
+      : '—');
+  }
+
+  // Gmail indicator (overview + otp view)
+  const gmailOk = config.gmailConfigured;
+  setGmailIndicator('ov-gmail-dot', 'ov-gmail-lbl', gmailOk);
+  setGmailIndicator('otp-gmail-dot', 'otp-gmail-lbl', gmailOk);
+
+  // OTP config
+  setText('otp-cfg-gmail', gmailOk ? '✅ credentials.json + token.json' : '❌ Not configured');
+  setText('otp-cfg-query', config.gmailOtpQuery || '—');
+  setText('otp-cfg-from',  config.fromFilter || '—');
+  setText('otp-cfg-poll',  config.pollIntervalMs ? (config.pollIntervalMs/1000)+'s' : '—');
+  setText('otp-cfg-max',   config.maxAttempts || '—');
+
+  // Settings
+  setText('cfg-email',     config.eshopEmail || '—');
+  setText('cfg-gmail',     gmailOk ? '✅ Configured' : '❌ Not configured');
+  setText('cfg-query',     config.gmailOtpQuery || '—');
+  setText('cfg-from',      config.fromFilter || '—');
+  setText('cfg-poll',      config.pollIntervalMs ? (config.pollIntervalMs/1000)+'s' : '—');
+  setText('cfg-max',       config.maxAttempts || '—');
+  setText('cfg-sess',      session.sessionFile ? '✅ ' + session.sessionFile : '❌ Not found');
+  setText('cfg-sess-age',  session.sessionAgeMinutes != null ? session.sessionAgeMinutes + ' min ago' : '—');
+  setText('cfg-last-login',session.lastLogin ? new Date(session.lastLogin).toLocaleString() : '—');
+}
+
+function setGmailIndicator(dotId, lblId, ok) {
+  const dot = document.getElementById(dotId);
+  const lbl = document.getElementById(lblId);
+  if (!dot || !lbl) return;
+  dot.className = ok ? 'dot' : 'dot off';
+  lbl.textContent = ok ? 'Gmail API configured' : 'Gmail API not configured — run node scripts/gmailAuth.js';
+}
+
+function renderTimeline(session, running, lastResult) {
+  const cur     = session.workflowStep || '';
+  const failed  = session.status === 'failed';
+  const done    = !running && lastResult?.success;
+  const curIdx  = STEP_ORDER.indexOf(cur);
+
+  const html = STEP_ORDER.map((step, i) => {
+    let cls = 'pend', icon = '○';
+    if (done)                                  { cls = 'done';   icon = '✓'; }
+    else if (failed && step === cur)           { cls = 'fail';   icon = '✗'; }
+    else if (running && step === cur)          { cls = 'active'; icon = '◉'; }
+    else if (running && i < curIdx)            { cls = 'done';   icon = '✓'; }
+    else if (!running && lastResult && i <= curIdx) {
+      cls  = (lastResult.success || i < curIdx) ? 'done' : 'fail';
+      icon = (lastResult.success || i < curIdx) ? '✓' : '✗';
+    }
+    return `<div class="tl-step">
+      <div class="tl-dot ${cls}">${icon}</div>
+      <div>
+        <div class="tl-lbl">${STEP_LABELS[step] || step}</div>
+        ${running && step === cur ? '<div class="tl-sub">In progress…</div>' : ''}
+        ${failed && step === cur && session.lastError ? `<div class="tl-sub" style="color:var(--red)">${escHtml(session.lastError)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  const el = document.getElementById('plat-timeline');
+  if (el) el.innerHTML = html;
+}
+
+// ─── Platform cards ─────────────────────────────────────────────────────────
+function renderPlatforms() {
+  renderPlatformGrid('overview-platforms', platformsData, true);
+  renderPlatformGrid('platforms-grid',     platformsData, false);
+}
+
+function renderPlatformGrid(containerId, platforms, overview) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const active = platforms.filter(p => p.available);
+  if (!active.length) { el.innerHTML = '<div class="empty">No platforms loaded</div>'; return; }
+  const latest = (jobsData || []).filter(j => j.connectorId).reduce((acc, j) => {
+    if (!acc[j.connectorId] || j.createdAt > acc[j.connectorId].createdAt) acc[j.connectorId] = j;
+    return acc;
+  }, {});
+  el.innerHTML = active.map(p => platformCard(p, latest[p.id], overview)).join('');
+}
+
+function platformCard(p, lastJob, overview) {
+  const clr  = PLATFORM_COLORS[p.id] || 'gr';
+  const stub = !p.available;
+  const badge = stub
+    ? '<span class="pc-badge soon">Coming Soon</span>'
+    : '<span class="pc-badge connected">● Active</span>';
+
+  let details = '';
+  const lastInfo = lastJob ? timeAgo(lastJob.createdAt) + (lastJob.status === 'success' ? ' ✓' : ' ✗') : 'Never';
+  if (p.id === 'eshopbox' && !stub) {
+    const sessOk  = p.sessionExists;
+    const gmailOk = p.gmailConfigured;
+    details = `<div class="pc-details">
+      <div class="pc-row"><span class="lbl">Session</span><span class="${sessOk?'good':'bad'}">${sessOk?'✓ Active':'❌ Not found'}</span></div>
+      <div class="pc-row"><span class="lbl">Gmail OAuth</span><span class="${gmailOk?'good':'bad'}">${gmailOk?'✓ Configured':'❌ Not configured'}</span></div>
+      <div class="pc-row"><span class="lbl">Account</span><span class="val">${p.email||'—'}</span></div>
+      <div class="pc-row"><span class="lbl">Last Run</span><span class="val">${lastInfo}</span></div>
+    </div>`;
+  } else if ((p.id === 'gokwik' || p.id === 'easebuzz') && !stub) {
+    const tokenOk = p.tokenConfigured;
+    details = `<div class="pc-details">
+      <div class="pc-row"><span class="lbl">Gmail Token</span><span class="${tokenOk?'good':'bad'}">${tokenOk?'✓ Configured':'❌ Run gmailAuthDigital.js'}</span></div>
+      <div class="pc-row"><span class="lbl">Account</span><span class="val">${p.account||'—'}</span></div>
+      <div class="pc-row"><span class="lbl">Sender</span><span class="val">${p.sender||'—'}</span></div>
+      <div class="pc-row"><span class="lbl">Last Run</span><span class="val">${lastInfo}</span></div>
+    </div>`;
+  }
+
+  const actions = stub
+    ? ''
+    : `<div class="pc-actions">
+        <button class="btn btn-primary btn-sm" onclick="openRunModal('${p.id}','${escHtml(p.name)}')">▶ Run</button>
+        <button class="btn btn-ghost btn-sm" onclick="showView('settings')">⚙</button>
+      </div>`;
+
+  return `<div class="pc ${stub?'stub':''}" id="pc-${p.id}">
+    <div class="pc-hdr">
+      <div class="pc-emoji ${clr}">${p.emoji||'🔌'}</div>
+      <div class="pc-name-wrap"><div class="pc-name">${p.name}</div><div class="pc-desc">${p.description||''}</div></div>
+      ${badge}
+    </div>
+    ${details}
+    ${actions}
+  </div>`;
+}
+
+// ─── Jobs ───────────────────────────────────────────────────────────────────
+function renderJobs() {
+  // overview (last 5)
+  const el = document.getElementById('overview-jobs-body');
+  if (el) {
+    const slice = jobsData.slice(0, 5);
+    el.innerHTML = slice.length
+      ? slice.map(j => `<tr>
+          <td>${j.connectorId}</td>
+          <td><span class="badge ${j.status}">${j.status}</span></td>
+          <td style="color:var(--text2)">${timeAgo(j.createdAt)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="3" class="empty">No jobs yet</td></tr>';
+  }
+
+  // full jobs table
+  const body = document.getElementById('jobs-body');
+  if (!body) return;
+  const filtered = jobFilter === 'all' ? jobsData : jobsData.filter(j => j.status === jobFilter);
+  if (!filtered.length) { body.innerHTML = '<tr><td colspan="6" class="empty">No jobs match</td></tr>'; return; }
+  body.innerHTML = filtered.map(j => {
+    const dur = j.startedAt && j.completedAt
+      ? ((new Date(j.completedAt) - new Date(j.startedAt))/1000).toFixed(1) + 's'
+      : j.startedAt ? 'Running…' : '—';
+    const params = j.params?.months?.length
+      ? j.params.months.map(m => SHORT_MONTHS[m.month-1]+' '+m.year).join(', ')
+      : '—';
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${j.id}</td>
+      <td>${j.connectorId}</td>
+      <td class="job-params">${escHtml(params)}</td>
+      <td><span class="badge ${j.status}">${j.status}</span></td>
+      <td style="color:var(--text2)">${timeAgo(j.createdAt)}</td>
+      <td style="color:var(--text2)">${dur}</td>
+    </tr>`;
+  }).join('');
+}
+
+function setJobFilter(f, btn) {
+  jobFilter = f;
+  document.querySelectorAll('#jobs-filter button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderJobs();
+}
+
+// ─── OTP ────────────────────────────────────────────────────────────────────
+function renderOtp() {
+  const latest = otpHistory[0];
+
+  function setOtpDisplay(bigId, metaId) {
+    const bigEl  = document.getElementById(bigId);
+    const metaEl = document.getElementById(metaId);
+    if (!bigEl) return;
+    if (latest) {
+      bigEl.className  = 'otp-big';
+      bigEl.textContent = latest.otp;
+      if (metaEl) metaEl.textContent = `From ${latest.source||'—'} · ${latest.emailDate?new Date(latest.emailDate).toLocaleTimeString():'—'} · ${latest.status}`;
+    }
+  }
+  setOtpDisplay('ov-otp',     'ov-otp-meta');
+  setOtpDisplay('otp-latest', 'otp-latest-meta');
+
+  const body = document.getElementById('otp-history-body');
+  if (!body) return;
+  body.innerHTML = otpHistory.length
+    ? otpHistory.map(h => `<tr>
+        <td style="font-family:var(--mono);font-weight:600;letter-spacing:3px">${h.otp}</td>
+        <td style="color:var(--text2)">${h.source||'—'}</td>
+        <td style="color:var(--text2)">${h.recordedAt?new Date(h.recordedAt).toLocaleTimeString():'—'}</td>
+        <td><span class="badge ${h.status?.startsWith('failed')?'failed':h.status||'queued'}">${h.status||'—'}</span></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" class="empty">No OTP history yet</td></tr>';
+}
+
+// ─── Logs ────────────────────────────────────────────────────────────────────
+function renderLogs() {
+  const search = (document.getElementById('log-search')?.value || '').toLowerCase();
+  let logs = logFilter === 'all' ? allLogs : allLogs.filter(l => l.level === logFilter);
+  if (search) logs = logs.filter(l => l.msg?.toLowerCase().includes(search));
+
+  const renderToBox = (boxId) => {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    const atBottom = box.scrollHeight - box.scrollTop < box.clientHeight + 40;
+    box.innerHTML = logs.length
+      ? logs.map(l => `<div class="log-line">
+          <span class="log-ts">${l.ts?l.ts.slice(11,19):''}</span>
+          <span class="log-lvl ${l.level}">${l.level.toUpperCase()}</span>
+          <span class="log-msg">${escHtml(l.msg||'')}</span>
+        </div>`).join('')
+      : '<div class="log-line"><span class="log-msg" style="color:var(--text3)">No logs match.</span></div>';
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  };
+  renderToBox('log-box');
+  renderToBox('ov-log-box');
+}
+
+function setLogFilter(f, btn) {
+  logFilter = f;
+  document.querySelectorAll('.log-filter button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLogs();
+}
+
+// ─── Modal (run) ─────────────────────────────────────────────────────────────
+function openRunModal(connectorId, name) {
+  modalConnectorId = connectorId;
+  modalSelectedMonths.clear();
+  document.getElementById('modal-title').textContent = `Run ${name}`;
+
+  // Init year selector
+  const yr = document.getElementById('modal-year');
+  yr.innerHTML = '';
+  const now = new Date();
+  const cy  = now.getFullYear();
+  for (let y = cy; y >= cy - 2; y--) {
+    const o = document.createElement('option'); o.value = y; o.textContent = y; yr.appendChild(o);
+  }
+  yr.removeEventListener('change', renderModalChips);
+  yr.addEventListener('change', renderModalChips);
+
+  // Pre-select last month
+  const pm = now.getMonth() === 0 ? 12 : now.getMonth();
+  const py = now.getMonth() === 0 ? cy - 1 : cy;
+  modalSelectedMonths.add(`${py}-${pm}`);
+
+  renderModalChips();
+  document.getElementById('runModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('runModal').style.display = 'none';
+}
+
+function handleOverlayClick(e) {
+  if (e.target.classList.contains('overlay')) closeModal();
+}
+
+function renderModalChips() {
+  const yr   = parseInt(document.getElementById('modal-year').value);
+  const grid = document.getElementById('modal-chips');
+  grid.innerHTML = SHORT_MONTHS.map((m, i) => {
+    const key = `${yr}-${i+1}`;
+    const sel = modalSelectedMonths.has(key) ? 'sel' : '';
+    return `<div class="m-chip ${sel}" onclick="toggleModalMonth(${yr},${i+1})">${m}</div>`;
+  }).join('');
+  updateModalInfo();
+}
+
+function toggleModalMonth(year, month) {
+  const key = `${year}-${month}`;
+  modalSelectedMonths.has(key) ? modalSelectedMonths.delete(key) : modalSelectedMonths.add(key);
+  renderModalChips();
+}
+
+function modalSelectAll() {
+  const yr = parseInt(document.getElementById('modal-year').value);
+  for (let m = 1; m <= 12; m++) modalSelectedMonths.add(`${yr}-${m}`);
+  renderModalChips();
+}
+
+function modalClear() {
+  modalSelectedMonths.clear();
+  renderModalChips();
+}
+
+function updateModalInfo() {
+  const info = document.getElementById('modal-sel-info');
+  const n = modalSelectedMonths.size;
+  if (n === 0) { info.textContent = 'No months selected'; return; }
+  const labels = [...modalSelectedMonths]
+    .map(k => { const [y,m] = k.split('-').map(Number); return `${MONTH_NAMES[m-1]} ${y}`; })
+    .sort().join(', ');
+  info.textContent = `Selected: ${labels}`;
+  const btn = document.getElementById('modal-run-btn');
+  if (btn) btn.textContent = `▶ Run (${n} month${n>1?'s':''})`;
+}
+
+async function submitRun() {
+  if (modalSelectedMonths.size === 0) { toast('Select at least one month', 'error'); return; }
+  const months = [...modalSelectedMonths].map(k => {
+    const [year, month] = k.split('-').map(Number);
+    return { year, month };
+  }).sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+  closeModal();
+  try {
+    const r = await api(`/api/platforms/${modalConnectorId}/run`, {
+      method: 'POST',
+      body: JSON.stringify({ months }),
+    });
+    if (r.started) {
+      const labels = months.map(m => `${MONTH_NAMES[m.month-1]} ${m.year}`).join(', ');
+      toast(`Started — ${labels}`, 'success');
+      showView('jobs');
+    } else {
+      toast('Could not start: ' + (r.reason || 'unknown'), 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+async function testGmail() {
+  toast('Testing Gmail API…', '');
+  try {
+    const r = await api('/api/imap/test', { method: 'POST' });
+    toast(r.ok ? 'Gmail API connected ✓' : 'Gmail failed: ' + r.error, r.ok ? 'success' : 'error');
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function fetchOtpNow() {
+  toast('Fetching OTP via Gmail…', '');
+  try {
+    const r = await api('/api/otp/fetch', { method: 'POST' });
+    toast(r.otp ? 'OTP: ' + r.otp : 'No OTP: ' + (r.error||'unknown'), r.otp ? 'success' : 'error');
+    pollOtp();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function clearSession() {
+  if (!confirm('Delete eshopbox-session.json?')) return;
+  try {
+    const r = await api('/api/session/clear', { method: 'DELETE' });
+    toast(r.ok ? 'Session cleared' : 'Failed: ' + r.error, r.ok ? 'success' : 'error');
+    pollStatus();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function clearLogs() {
+  await api('/api/logs/clear', { method: 'DELETE' });
+  allLogs = []; renderLogs();
+  toast('Logs cleared', '');
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const s = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (s <  60)   return s + 's ago';
+  if (s < 3600)  return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+
+// ─── Run All ─────────────────────────────────────────────────────────────────
+const RA_CONNECTOR_ORDER = ['eshopbox','gokwik','easebuzz','kwikengage','_drive'];
+const RA_CONNECTOR_NAME  = {
+  eshopbox:   'eShopBox',
+  gokwik:     'GoKwik',
+  easebuzz:   'Easebuzz',
+  kwikengage: 'KwikEngage',
+  _drive:     'Google Drive Upload',
+};
+
+function initRunAllView() {
+  const monthSel = document.getElementById('ra-month');
+  const yearSel  = document.getElementById('ra-year');
+  if (!monthSel || !yearSel || monthSel.options.length) return; // already initialized
+
+  MONTH_NAMES.forEach((m, i) => {
+    const o = document.createElement('option');
+    o.value = i + 1; o.textContent = m; monthSel.appendChild(o);
+  });
+
+  const now = new Date(), cy = now.getFullYear();
+  for (let y = cy; y >= cy - 2; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y; yearSel.appendChild(o);
+  }
+
+  // Default: last month
+  const pm = now.getMonth() === 0 ? 12 : now.getMonth();
+  const py = now.getMonth() === 0 ? cy - 1 : cy;
+  monthSel.value = pm;
+  yearSel.value  = py;
+
+  checkDriveStatus();
+}
+
+async function checkDriveStatus() {
+  const el   = document.getElementById('ra-drive-status');
+  const hint = document.getElementById('ra-drive-hint');
+  try {
+    const r = await api('/api/drive/status');
+    if (el) {
+      el.textContent = r.configured ? '✅ Connected (isha@nubokind.com)' : '❌ Not configured';
+      el.style.color = r.configured ? 'var(--green)' : 'var(--red)';
+    }
+    if (hint) hint.style.display = r.configured ? 'none' : 'block';
+  } catch {
+    if (el) el.textContent = '❌ Error checking status';
+  }
+}
+
+async function submitRunAll() {
+  const month = parseInt(document.getElementById('ra-month').value);
+  const year  = parseInt(document.getElementById('ra-year').value);
+  const btn   = document.getElementById('ra-run-btn');
+
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  try {
+    const r = await api('/api/run-all', {
+      method: 'POST',
+      body: JSON.stringify({ month, year }),
+    });
+    if (r.started) {
+      toast(`Run All started — ${MONTH_NAMES[month - 1]} ${year}`, 'success');
+      document.getElementById('ra-progress-card').style.display = 'block';
+    } else {
+      toast('Could not start: ' + (r.reason || 'unknown'), 'error');
+      btn.disabled = false;
+      btn.textContent = '▶ Run All Platforms';
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '▶ Run All Platforms';
+  }
+}
+
+function renderRunAllProgress() {
+  const job = (jobsData || []).find(j => j.connectorId === 'all');
+  if (!job) return;
+
+  const card    = document.getElementById('ra-progress-card');
+  const badge   = document.getElementById('ra-job-badge');
+  const tl      = document.getElementById('ra-tl');
+  const summary = document.getElementById('ra-summary');
+  const btn     = document.getElementById('ra-run-btn');
+
+  if (!card || !tl) return;
+  card.style.display = 'block';
+
+  if (badge) { badge.className = 'badge ' + job.status; badge.textContent = job.status; }
+
+  if (btn && job.status !== 'running') {
+    btn.disabled = false;
+    btn.textContent = '▶ Run All Platforms';
+  }
+
+  const results = job.results || {};
+
+  tl.innerHTML = RA_CONNECTOR_ORDER.map(id => {
+    const r    = results[id] || {};
+    const name = RA_CONNECTOR_NAME[id];
+    const cur  = job.currentConnector === id;
+
+    let cls, icon, sub;
+    if (r.status === 'success') {
+      cls = 'done'; icon = '✓';
+      sub = id === '_drive'
+        ? `${r.count} file(s) uploaded to Drive folder "${r.folder}"`
+        : `${r.count} invoice(s) downloaded`;
+    } else if (r.status === 'failed') {
+      cls = 'fail'; icon = '✗'; sub = escHtml(r.error || 'Failed');
+    } else if (r.status === 'running' || cur) {
+      cls = 'active'; icon = '◉'; sub = 'Running…';
+    } else if (r.status === 'skipped') {
+      cls = 'pend'; icon = '—';
+      sub = r.reason === 'not_configured'
+        ? 'Drive not authorized — run: node scripts/driveAuth.js'
+        : 'Skipped';
+    } else {
+      cls = 'pend'; icon = '○'; sub = 'Pending';
+    }
+
+    return `<div class="tl-step">
+      <div class="tl-dot ${cls}">${icon}</div>
+      <div>
+        <div class="tl-lbl">${name}</div>
+        <div class="tl-sub">${sub}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (summary) {
+    if (job.status === 'success') {
+      const total  = job.filesTotal || 0;
+      const folder = results._drive?.folder;
+      summary.textContent = `${total} invoice(s) downloaded`
+        + (folder ? ` · uploaded to Drive folder "${folder}"` : '');
+    } else if (job.status === 'running') {
+      summary.textContent = 'Automation in progress…';
+    }
+  }
+}
+
+// Initialize Run All view when navigating to it
+document.querySelectorAll('.nav-item').forEach(el => {
+  if (el.dataset.view === 'runall') {
+    el.addEventListener('click', initRunAllView, { once: false });
+  }
+});
+
+// ─── Init + polling ───────────────────────────────────────────────────────────
+pollStatus();
+pollPlatforms();
+pollJobs();
+pollLogs();
+
+setInterval(pollStatus,    3000);
+setInterval(pollJobs,      3000);
+setInterval(pollPlatforms, 10000);
+setInterval(pollLogs,      2000);
+</script>
+</body>
+</html>

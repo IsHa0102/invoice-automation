@@ -1,0 +1,11 @@
+node_modules
+.env
+credentials.json
+token.json
+token-digital.json
+token-drive.json
+*-session.json
+src/storage/downloaded
+*.png
+.git
+.gitignore

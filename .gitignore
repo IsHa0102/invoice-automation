@@ -1,0 +1,23 @@
+node_modules/
+
+# Sensitive credentials — never commit these
+.env
+credentials.json
+token.json
+token-digital.json
+token-drive.json
+*-session.json
+
+# Downloaded invoices
+src/storage/downloaded/
+
+# Playwright debug screenshots
+*.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+*.html.bak
+eshopbox-login-post-otp-still-on-login.html

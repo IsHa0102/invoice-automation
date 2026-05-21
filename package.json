@@ -1,0 +1,20 @@
+{
+  "name": "nubokind-invoice-automation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "ui": "node src/server.js",
+    "eshopbox": "node scripts/runEshopbox.js",
+    "email:fetch": "node scripts/runEmailFetch.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "googleapis": "^144.0.0",
+    "mailparser": "^3.9.8",
+    "node-imap": "^0.9.6",
+    "playwright": "^1.49.1"
+  }
+}
