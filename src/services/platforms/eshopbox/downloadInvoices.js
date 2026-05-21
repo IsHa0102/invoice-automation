@@ -14,19 +14,25 @@ const INVOICE_HASH   = "#/invoices?filter_by=Status.Invoices&sort_order=D";
 async function navigateToInvoices(page) {
   log("Navigating to Eshopbox billing portal...");
 
-  await page.goto(BILLING_PORTAL + INVOICE_HASH, { waitUntil: "domcontentloaded" });
+  // Navigate to base URL — SAML redirect strips hash, so don't include it yet
+  await page.goto(BILLING_PORTAL, { waitUntil: "domcontentloaded" });
 
+  // Wait for SAML redirect chain to settle back on the portal
   try {
     await page.waitForURL(
       (url) => url.href.startsWith(BILLING_PORTAL),
-      { timeout: 20000 }
+      { timeout: 30000 }
     );
   } catch { /* already on portal */ }
 
-  if (!page.url().includes("invoices")) {
-    log("Re-applying invoice hash route after SAML redirect...");
-    await page.goto(BILLING_PORTAL + INVOICE_HASH, { waitUntil: "domcontentloaded" });
-  }
+  debug(`Portal landed at: ${page.url()}`);
+
+  // Apply hash route via JS — avoids triggering another SAML redirect
+  log("Applying invoices hash route...");
+  await page.evaluate((hash) => { window.location.hash = hash; }, "/invoices?filter_by=Status.Invoices&sort_order=D");
+
+  // Give the SPA router time to respond to the hash change
+  await page.waitForTimeout(3000);
 
   try {
     await page.waitForSelector("table tbody tr", { timeout: 15000 });
