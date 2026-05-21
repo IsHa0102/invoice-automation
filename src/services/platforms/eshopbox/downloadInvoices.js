@@ -100,6 +100,45 @@ async function waitForTableStable(page, { timeout = 20000, interval = 1500, stab
   return Math.max(lastCount, 0);
 }
 
+// Scroll the table/page repeatedly to trigger lazy-load until row count stops growing
+async function scrollToLoadAllRows(page) {
+  let lastCount = 0;
+  let sameRounds = 0;
+
+  while (sameRounds < 3) {
+    // Scroll the page to the bottom
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    // Also scroll the nearest scrollable table container
+    await page.evaluate(() => {
+      const table = document.querySelector("table");
+      if (!table) return;
+      let el = table.parentElement;
+      while (el && el !== document.body) {
+        const { overflowY } = getComputedStyle(el);
+        if (overflowY === "auto" || overflowY === "scroll") {
+          el.scrollTop = el.scrollHeight;
+          break;
+        }
+        el = el.parentElement;
+      }
+    });
+
+    await page.waitForTimeout(1500);
+
+    const count = await page.locator("table tbody tr").count();
+    debug(`Scroll-load: ${count} rows`);
+    if (count === lastCount) {
+      sameRounds++;
+    } else {
+      sameRounds = 0;
+      lastCount = count;
+    }
+  }
+
+  log(`All rows loaded: ${lastCount} total`);
+  return lastCount;
+}
+
 async function collectMatchingInvoices(page, datePattern, label) {
   try {
     await page.waitForSelector("table tbody tr", { timeout: 15000 });
@@ -108,8 +147,8 @@ async function collectMatchingInvoices(page, datePattern, label) {
     return [];
   }
 
-  // Wait for table to fully populate — on cloud servers JS rendering is slower
-  const totalRows = await waitForTableStable(page);
+  // Scroll down to trigger lazy-loading until all rows are visible
+  const totalRows = await scrollToLoadAllRows(page);
   debug(`Total rows in table: ${totalRows}`);
 
   const matchingRows = page.locator("table tbody tr").filter({ hasText: datePattern });
