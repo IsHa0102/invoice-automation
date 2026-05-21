@@ -15,14 +15,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Write tokens from env vars if provided (Railway ephemeral filesystem workaround)
 const tokenFiles = [
-  [process.env.DRIVE_TOKEN_JSON,        ENV.DRIVE_TOKEN_PATH],
-  [process.env.GMAIL_DIGITAL_TOKEN_JSON, ENV.GMAIL_DIGITAL_TOKEN_PATH],
-  [process.env.GMAIL_TOKEN_JSON,         ENV.GMAIL_TOKEN_PATH],
-  [process.env.GMAIL_CREDENTIALS_JSON,   ENV.GMAIL_CREDENTIALS_PATH],
+  ["DRIVE_TOKEN_JSON",         process.env.DRIVE_TOKEN_JSON,         ENV.DRIVE_TOKEN_PATH],
+  ["GMAIL_DIGITAL_TOKEN_JSON", process.env.GMAIL_DIGITAL_TOKEN_JSON, ENV.GMAIL_DIGITAL_TOKEN_PATH],
+  ["GMAIL_TOKEN_JSON",         process.env.GMAIL_TOKEN_JSON,         ENV.GMAIL_TOKEN_PATH],
+  ["GMAIL_CREDENTIALS_JSON",   process.env.GMAIL_CREDENTIALS_JSON,   ENV.GMAIL_CREDENTIALS_PATH],
 ];
-for (const [content, filePath] of tokenFiles) {
-  if (content && filePath && !fs.existsSync(filePath)) {
-    try { fs.writeFileSync(filePath, content, "utf8"); } catch {}
+for (const [name, content, filePath] of tokenFiles) {
+  if (!content) { console.log(`[startup] ${name} not set — skipping`); continue; }
+  if (fs.existsSync(filePath)) { console.log(`[startup] ${name} → ${filePath} already exists`); continue; }
+  try {
+    fs.writeFileSync(filePath, content, "utf8");
+    console.log(`[startup] ${name} → wrote ${filePath}`);
+  } catch (e) {
+    console.error(`[startup] ${name} → FAILED to write ${filePath}: ${e.message}`);
   }
 }
 
