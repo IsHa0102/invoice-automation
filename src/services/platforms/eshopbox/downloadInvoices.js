@@ -100,38 +100,40 @@ async function waitForTableStable(page, { timeout = 20000, interval = 1500, stab
   return Math.max(lastCount, 0);
 }
 
-// Scroll the table/page repeatedly to trigger lazy-load until row count stops growing
+// Scroll the last table row into view repeatedly to trigger lazy-load until row count stops growing
 async function scrollToLoadAllRows(page) {
   let lastCount = 0;
   let sameRounds = 0;
 
-  while (sameRounds < 3) {
-    // Scroll the page to the bottom
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    // Also scroll the nearest scrollable table container
+  while (sameRounds < 4) {
+    // Scroll last row into view — most reliable trigger for infinite-scroll/virtual tables
+    const rows = page.locator("table tbody tr");
+    const count = await rows.count();
+    if (count > 0) {
+      await rows.last().scrollIntoViewIfNeeded().catch(() => {});
+    }
+
+    // Also scroll window and every ancestor with overflow scroll
     await page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight);
       const table = document.querySelector("table");
       if (!table) return;
       let el = table.parentElement;
       while (el && el !== document.body) {
-        const { overflowY } = getComputedStyle(el);
-        if (overflowY === "auto" || overflowY === "scroll") {
-          el.scrollTop = el.scrollHeight;
-          break;
-        }
+        el.scrollTop = el.scrollHeight;
         el = el.parentElement;
       }
     });
 
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
 
-    const count = await page.locator("table tbody tr").count();
-    debug(`Scroll-load: ${count} rows`);
-    if (count === lastCount) {
+    const newCount = await page.locator("table tbody tr").count();
+    debug(`Scroll-load: ${newCount} rows`);
+    if (newCount === lastCount) {
       sameRounds++;
     } else {
       sameRounds = 0;
-      lastCount = count;
+      lastCount = newCount;
     }
   }
 
