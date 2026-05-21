@@ -4,7 +4,7 @@ import fs from "fs";
 import { ENV } from "../../../config/env.js";
 import { SELECTORS } from "./selectors.js";
 import { debug, error, log, warn } from "../../../utils/logger.js";
-import { fetchOtpViaImapDirect, confirmOtpUsed, failOtp } from "../../otp/otpFetcher.js";
+import { fetchOtpViaImapDirect, fetchOtpViaImap, confirmOtpUsed, failOtp } from "../../otp/otpFetcher.js";
 import { setStatus, setWorkflowStep } from "../../session/sessionManager.js";
 
 const OTP_INPUT_SELECTORS = [
@@ -91,24 +91,41 @@ async function resolveOtp() {
     return { otp: ENV.ESHOPBOX_DEV_OTP, entryId: null };
   }
 
-  // Try IMAP if EMAIL_USER + EMAIL_APP_PASSWORD are configured
+  // Try IMAP first; fall back to Gmail API if IMAP is blocked (common on cloud servers)
   if (ENV.EMAIL_USER && ENV.EMAIL_APP_PASSWORD) {
     log("Fetching OTP via IMAP...");
     setStatus("otp_pending");
     try {
-      const result = await fetchOtpViaImapDirect({
+      return await fetchOtpViaImapDirect({
+        maxAttempts: 2,
+        delayMs: ENV.IMAP_POLL_INTERVAL_MS,
+        sinceMinutes: ENV.IMAP_SINCE_MINUTES,
+        fromFilter: ENV.IMAP_FROM_FILTER,
+      });
+    } catch (err) {
+      warn(`IMAP failed (${err.message}) — trying Gmail API fallback...`);
+    }
+  }
+
+  // Gmail API fallback (works from any IP, needs credentials.json + token.json)
+  const hasGmailOAuth =
+    fs.existsSync(ENV.GMAIL_CREDENTIALS_PATH) && fs.existsSync(ENV.GMAIL_TOKEN_PATH);
+  if (hasGmailOAuth) {
+    log("Fetching OTP via Gmail API...");
+    setStatus("otp_pending");
+    try {
+      return await fetchOtpViaImap({
         maxAttempts: ENV.IMAP_MAX_ATTEMPTS,
         delayMs: ENV.IMAP_POLL_INTERVAL_MS,
         sinceMinutes: ENV.IMAP_SINCE_MINUTES,
         fromFilter: ENV.IMAP_FROM_FILTER,
       });
-      return result;
     } catch (err) {
-      warn(`IMAP OTP fetch failed: ${err.message}`);
+      warn(`Gmail API OTP fetch failed: ${err.message}`);
       if (!ENV.ESHOPBOX_MANUAL_OTP) throw err;
     }
   } else {
-    warn("IMAP not configured (EMAIL_USER / EMAIL_APP_PASSWORD missing)");
+    warn("No OTP method available — set EMAIL_APP_PASSWORD or add GMAIL_CREDENTIALS_JSON + GMAIL_TOKEN_JSON to Railway");
   }
 
   // Fallback to manual
