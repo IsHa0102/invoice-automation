@@ -4,7 +4,7 @@ import fs from "fs";
 import { ENV } from "../../../config/env.js";
 import { SELECTORS } from "./selectors.js";
 import { debug, error, log, warn } from "../../../utils/logger.js";
-import { fetchOtpViaImap, confirmOtpUsed, failOtp } from "../../otp/otpFetcher.js";
+import { fetchOtpViaImapDirect, confirmOtpUsed, failOtp } from "../../otp/otpFetcher.js";
 import { setStatus, setWorkflowStep } from "../../session/sessionManager.js";
 
 const OTP_INPUT_SELECTORS = [
@@ -96,7 +96,7 @@ async function resolveOtp() {
     log("Fetching OTP via IMAP...");
     setStatus("otp_pending");
     try {
-      const result = await fetchOtpViaImap({
+      const result = await fetchOtpViaImapDirect({
         maxAttempts: ENV.IMAP_MAX_ATTEMPTS,
         delayMs: ENV.IMAP_POLL_INTERVAL_MS,
         sinceMinutes: ENV.IMAP_SINCE_MINUTES,

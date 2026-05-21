@@ -6,7 +6,8 @@
 
 import { getGmailAuth } from "../gmail/gmailClient.js";
 import { getOtpFromEmail } from "../gmail/getOtpFromEmail.js";
-import { markOtpUsed, updateOtpStatus } from "./otpExtractor.js";
+import { fetchRecentEmails } from "../imap/imapService.js";
+import { extractOtpFromEmail, isOtpUsed, recordOtp, markOtpUsed, updateOtpStatus } from "./otpExtractor.js";
 import { debug, error, log, warn } from "../../utils/logger.js";
 import { ENV } from "../../config/env.js";
 
@@ -74,4 +75,45 @@ export function failOtp(otp, entryId, reason) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Fetch OTP via IMAP App Password (no OAuth files needed).
+ * Uses EMAIL_USER + EMAIL_APP_PASSWORD env vars.
+ */
+export async function fetchOtpViaImapDirect({
+  maxAttempts = 5,
+  delayMs = 5000,
+  sinceMinutes = 15,
+  fromFilter = "eshopbox",
+} = {}) {
+  log(`Starting OTP fetch via IMAP (max ${maxAttempts} attempts, every ${delayMs / 1000}s)`);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    debug(`IMAP OTP attempt ${attempt}/${maxAttempts}`);
+    try {
+      const emails = await fetchRecentEmails({ maxResults: 10, fromFilter, sinceMinutes });
+
+      for (const email of [...emails].reverse()) {
+        const result = extractOtpFromEmail(email);
+        if (!result) continue;
+
+        const { otp, source, emailDate } = result;
+        if (isOtpUsed(otp)) { debug(`OTP ${otp} already used — skipping`); continue; }
+
+        const entry = recordOtp({ otp, source, emailDate, uid: email.uid, status: "extracted" });
+        log(`OTP extracted via IMAP: ${otp}`);
+        return { otp, entryId: entry.id };
+      }
+
+      debug(`No OTP in emails on attempt ${attempt}`);
+    } catch (err) {
+      error(`IMAP attempt ${attempt} failed: ${err.message}`);
+      if (attempt === maxAttempts) throw err;
+    }
+
+    if (attempt < maxAttempts) await sleep(delayMs);
+  }
+
+  throw new Error(`No OTP found after ${maxAttempts} attempts`);
 }
