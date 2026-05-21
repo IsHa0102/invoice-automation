@@ -14,30 +14,30 @@ const INVOICE_HASH   = "#/invoices?filter_by=Status.Invoices&sort_order=D";
 async function navigateToInvoices(page) {
   log("Navigating to Eshopbox billing portal...");
 
-  // Navigate to base URL — SAML redirect strips hash, so don't include it yet
+  // Step 1: go to billing portal base URL — may trigger SAML redirect to a different domain
   await page.goto(BILLING_PORTAL, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(3000); // allow redirect chain to settle
 
-  // Wait for SAML redirect chain to settle back on the portal
-  try {
-    await page.waitForURL(
-      (url) => url.href.startsWith(BILLING_PORTAL),
-      { timeout: 30000 }
-    );
-  } catch { /* already on portal */ }
+  const landedUrl = page.url();
+  debug(`Portal landed at: ${landedUrl}`);
 
-  debug(`Portal landed at: ${page.url()}`);
-
-  // Apply hash route via JS — avoids triggering another SAML redirect
-  log("Applying invoices hash route...");
-  await page.evaluate((hash) => { window.location.hash = hash; }, "/invoices?filter_by=Status.Invoices&sort_order=D");
-
-  // Give the SPA router time to respond to the hash change
-  await page.waitForTimeout(3000);
+  // Step 2: if SAML redirected us away from billing.myeshopbox.com, go back now.
+  // SAML cookies are now set, so the second visit should stay on billing portal.
+  if (!landedUrl.startsWith("https://billing.myeshopbox.com")) {
+    log(`SAML redirected to ${landedUrl} — navigating back to billing portal with invoice route...`);
+    await page.goto(BILLING_PORTAL + INVOICE_HASH, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(3000);
+    debug(`After return nav: ${page.url()}`);
+  } else {
+    // Already on billing portal — apply hash via JS to avoid another SAML round-trip
+    log("On billing portal — applying invoices hash route...");
+    await page.evaluate((hash) => { window.location.hash = hash; }, "/invoices?filter_by=Status.Invoices&sort_order=D");
+    await page.waitForTimeout(3000);
+  }
 
   try {
     await page.waitForSelector("table tbody tr", { timeout: 15000 });
-    log("Invoice list loaded — waiting for table to fully populate...");
-    await waitForTableStable(page);
+    log("Invoice list loaded");
   } catch {
     warn("Invoice table not visible — page may not have loaded correctly");
   }
