@@ -29,8 +29,9 @@ async function navigateToInvoices(page) {
   }
 
   try {
-    await page.waitForSelector("table tbody tr", { timeout: 12000 });
-    log("Invoice list loaded");
+    await page.waitForSelector("table tbody tr", { timeout: 15000 });
+    log("Invoice list loaded — waiting for table to fully populate...");
+    await waitForTableStable(page);
   } catch {
     warn("Invoice table not visible — page may not have loaded correctly");
   }
@@ -70,15 +71,39 @@ export async function downloadInvoices(page, months = []) {
   }
 }
 
+async function waitForTableStable(page, { timeout = 20000, interval = 1500, stableFor = 3 } = {}) {
+  const deadline = Date.now() + timeout;
+  let stableCount = 0;
+  let lastCount = -1;
+
+  while (Date.now() < deadline) {
+    const count = await page.locator("table tbody tr").count();
+    if (count > 0 && count === lastCount) {
+      stableCount++;
+      if (stableCount >= stableFor) {
+        debug(`Table stable at ${count} rows after ${stableFor} consistent checks`);
+        return count;
+      }
+    } else {
+      stableCount = 0;
+      lastCount = count;
+    }
+    await page.waitForTimeout(interval);
+  }
+  debug(`Table stabilization timed out — last row count: ${lastCount}`);
+  return Math.max(lastCount, 0);
+}
+
 async function collectMatchingInvoices(page, datePattern, label) {
   try {
-    await page.waitForSelector("table tbody tr", { timeout: 10000 });
+    await page.waitForSelector("table tbody tr", { timeout: 15000 });
   } catch {
     warn(`Invoice table not found for ${label}`);
     return [];
   }
 
-  const totalRows = await page.locator("table tbody tr").count();
+  // Wait for table to fully populate — on cloud servers JS rendering is slower
+  const totalRows = await waitForTableStable(page);
   debug(`Total rows in table: ${totalRows}`);
 
   const matchingRows = page.locator("table tbody tr").filter({ hasText: datePattern });
