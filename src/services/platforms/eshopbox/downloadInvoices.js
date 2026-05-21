@@ -149,27 +149,68 @@ async function collectMatchingInvoices(page, datePattern, label) {
     return [];
   }
 
-  // Scroll down to trigger lazy-loading until all rows are visible
-  const totalRows = await scrollToLoadAllRows(page);
-  debug(`Total rows in table: ${totalRows}`);
-
-  const matchingRows = page.locator("table tbody tr").filter({ hasText: datePattern });
-  const count = await matchingRows.count();
-  debug(`Rows matching "${datePattern}": ${count}`);
-
+  // The table is virtualized — only ~24 rows exist in the DOM at a time.
+  // Scroll-and-collect: read visible rows, scroll down, repeat until bottom row stops changing.
   const matched = [];
-  for (let i = 0; i < count; i++) {
-    const row = matchingRows.nth(i);
-    const rowText = (await row.textContent().catch(() => "")).trim().replace(/\s+/g, " ");
-    debug(`Matched row text: ${rowText}`);
+  const seenInvoices = new Set();
+  let noNewRowsRounds = 0;
+  let lastBottomText = null;
 
-    const invoiceNum = rowText.split(/\s+/)[0].trim();
-    if (invoiceNum) {
-      debug(`Found invoice: ${invoiceNum}`);
-      matched.push(invoiceNum);
+  log("Scanning invoice table (scroll-and-collect)...");
+
+  while (noNewRowsRounds < 4) {
+    const rows = page.locator("table tbody tr");
+    const count = await rows.count();
+
+    // Read all currently visible rows and collect matches
+    for (let i = 0; i < count; i++) {
+      const rowText = (await rows.nth(i).textContent().catch(() => "")).trim().replace(/\s+/g, " ");
+      if (!rowText) continue;
+
+      if (!seenInvoices.has(rowText) && rowText.includes(datePattern)) {
+        const invoiceNum = rowText.split(/\s+/)[0].trim();
+        if (invoiceNum && !seenInvoices.has(invoiceNum)) {
+          debug(`Found invoice: ${invoiceNum} (row: ${rowText.slice(0, 80)})`);
+          matched.push(invoiceNum);
+        }
+        seenInvoices.add(invoiceNum);
+      }
+    }
+
+    // Log a sample of visible rows on first pass to verify date format
+    if (lastBottomText === null && count > 0) {
+      const sample = await rows.first().textContent().catch(() => "");
+      debug(`Sample row text: ${sample.trim().replace(/\s+/g, " ").slice(0, 120)}`);
+    }
+
+    // Scroll down — try multiple methods
+    const lastRow = rows.last();
+    const bottomText = (await lastRow.textContent().catch(() => "")).trim();
+    await lastRow.scrollIntoViewIfNeeded().catch(() => {});
+    await page.keyboard.press("End");
+    await page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight);
+      document.querySelectorAll("*").forEach(el => {
+        const s = getComputedStyle(el);
+        if ((s.overflowY === "auto" || s.overflowY === "scroll") && el.scrollHeight > el.clientHeight) {
+          el.scrollTop = el.scrollHeight;
+        }
+      });
+    });
+    await page.waitForTimeout(2000);
+
+    const newBottomText = (await page.locator("table tbody tr").last().textContent().catch(() => "")).trim();
+    debug(`Scroll-collect: ${count} rows visible, bottom changed: ${newBottomText !== bottomText}`);
+
+    if (newBottomText === bottomText) {
+      noNewRowsRounds++;
+    } else {
+      noNewRowsRounds = 0;
+      lastBottomText = newBottomText;
     }
   }
 
+  log(`Scroll complete. Found ${matched.length} matching invoice(s) for ${label}`);
   return matched;
 }
 
