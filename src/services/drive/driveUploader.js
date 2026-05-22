@@ -39,8 +39,9 @@ async function getDriveAuth() {
 
 async function findOrCreateFolder(drive, name, parentId = "root") {
   const parentQ = parentId === "root" ? `'root' in parents` : `'${parentId}' in parents`;
+  const escapedName = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const list = await drive.files.list({
-    q: `name='${name}' and mimeType='application/vnd.google-apps.folder' and ${parentQ} and trashed=false`,
+    q: `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and ${parentQ} and trashed=false`,
     fields: "files(id,name)",
     spaces: "drive",
   });
