@@ -50,6 +50,7 @@ export const ENV = {
 
   // Google Drive
   DRIVE_TOKEN_PATH: process.env.DRIVE_TOKEN_PATH || "token-drive.json",
+  DRIVE_FOLDER_ID:  process.env.DRIVE_FOLDER_ID || "",
 
   // Server
   UI_PORT: Number(process.env.UI_PORT || 3030),

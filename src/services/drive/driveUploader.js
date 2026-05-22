@@ -5,7 +5,6 @@ import { ENV } from "../../config/env.js";
 import { log, debug, warn } from "../../utils/logger.js";
 
 const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const ROOT_FOLDER_NAME = "Nubo Invoices";
 
 function loadCredentials() {
   if (!fs.existsSync(ENV.GMAIL_CREDENTIALS_PATH)) {
@@ -37,13 +36,14 @@ async function getDriveAuth() {
   return oAuth2Client;
 }
 
-async function findOrCreateFolder(drive, name, parentId = "root") {
-  const parentQ = parentId === "root" ? `'root' in parents` : `'${parentId}' in parents`;
+async function findOrCreateFolder(drive, name, parentId) {
   const escapedName = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const list = await drive.files.list({
-    q: `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and ${parentQ} and trashed=false`,
+    q: `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`,
     fields: "files(id,name)",
     spaces: "drive",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   if (list.data.files.length > 0) {
@@ -58,6 +58,7 @@ async function findOrCreateFolder(drive, name, parentId = "root") {
       parents: [parentId],
     },
     fields: "id",
+    supportsAllDrives: true,
   });
   log(`Created Drive folder: "${name}" (${folder.data.id})`);
   return folder.data.id;
@@ -67,13 +68,13 @@ export async function uploadToDrive(files, { month, year }) {
   const auth  = await getDriveAuth();
   const drive = google.drive({ version: "v3", auth });
 
-  // Structure: Nubo Invoices / Jan'26 / files...
+  // Use DRIVE_FOLDER_ID (shared drive / folder) as the root parent for month folders
+  const rootParentId    = ENV.DRIVE_FOLDER_ID || "root";
   const monthFolderName = `${MONTH_ABBR[month - 1]}'${String(year).slice(2)}`;
-  log(`Uploading ${files.length} file(s) to Drive: ${ROOT_FOLDER_NAME} / ${monthFolderName}`);
+  log(`Uploading ${files.length} file(s) to Drive folder "${monthFolderName}" inside ${rootParentId}`);
 
-  const rootFolderId  = await findOrCreateFolder(drive, ROOT_FOLDER_NAME, "root");
-  const folderId      = await findOrCreateFolder(drive, monthFolderName, rootFolderId);
-  const uploaded  = [];
+  const folderId = await findOrCreateFolder(drive, monthFolderName, rootParentId);
+  const uploaded = [];
 
   for (const filePath of files) {
     if (!fs.existsSync(filePath)) {
@@ -87,12 +88,13 @@ export async function uploadToDrive(files, { month, year }) {
       requestBody: { name: fileName, parents: [folderId] },
       media: { mimeType: "application/pdf", body: fs.createReadStream(filePath) },
       fields: "id,name,webViewLink",
+      supportsAllDrives: true,
     });
     debug(`Uploaded: ${fileName} → ${res.data.webViewLink}`);
     uploaded.push({ name: fileName, id: res.data.id, link: res.data.webViewLink });
   }
 
-  log(`Drive upload complete — ${uploaded.length}/${files.length} file(s) in "${ROOT_FOLDER_NAME} / ${monthFolderName}"`);
+  log(`Drive upload complete — ${uploaded.length}/${files.length} file(s) in "${monthFolderName}"`);
   return { folderName: monthFolderName, folderId, uploaded };
 }
 
